@@ -15,12 +15,8 @@ dependencies = [
     "uvicorn",
     "pydantic",
     "httpx",
-    "python-multipart"
-]
-
-[project.optional-dependencies]
-dev = [
+    "python-multipart",
+    "pre-commit",
     "pytest",
     "scikit-bio",
-    
 ]

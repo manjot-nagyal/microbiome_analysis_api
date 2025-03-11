@@ -1,4 +1,4 @@
-import numpy as np
+# import numpy as np
 import pandas as pd
 
 from app.models.schemas import MicrobiomeData
@@ -8,6 +8,7 @@ def parse_csv_data(content_str: str) -> MicrobiomeData:
     """
     Parse the CSV data into a MicrobiomeData object
     """
+
     df = pd.read_csv(content_str, index_col=0)
 
     # Separate metadata from data
@@ -18,14 +19,14 @@ def parse_csv_data(content_str: str) -> MicrobiomeData:
     counts_df = df[data_cols]
 
     # TODO: Extract and format metadata
-    metadata_df = df[metadata_cols]
+    md_df = df[metadata_cols]
 
     # Create MicrobiomeData object
     microbiome_data = MicrobiomeData(
         sample_ids=counts_df.index.tolist(),
         feature_ids=counts_df.columns.tolist(),
         counts_matrix=counts_df.values.tolist(),
-        metadata=metadata_df.to_dict(orient="records") if metadata_df is not None else None
+        metadata=(md_df.to_dict(orient="records") if md_df is not None else None),
     )
 
     return microbiome_data

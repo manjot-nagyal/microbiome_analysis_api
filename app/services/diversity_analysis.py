@@ -1,40 +1,44 @@
+from typing import List, Tuple, Dict
+
 import numpy as np
+from scipy.spatial import distance
+from app.models.schemas import MicrobiomeData
+
 
 def shannon_diversity(counts: np.ndarray) -> float:
-    '''
+    """
 
     Calculate Shannon diversity index (H').
-    Shannon diversity index takes into account both abundance and evenness of the species present.
+    Shannon diversity index takes into account both abundance
+    and evenness of the species present.
 
     Formula: H' = -sum(p_i * ln(p_i)) for i = 1 to n
     where p_i is the proportion of individuals in the ith species.
 
     Args:
-        data (np.ndarray): A 2D array where each row represents an individual and each column represents a species.
+        data (np.ndarray): A 2D array where each row represents an
+        individual and each column represents a species.
 
     Returns:
         Shannon diversity index value, or NaN for edge cases
 
     Raises:
         ValueError: If any count value is negative
-    '''
+    """
     counts = np.asarray(counts, dtype=float)
 
     # account for negative abundance values
     if np.any(counts < 0):
         raise ValueError("Negative abundance values are not allowed")
-    
 
     counts = counts[counts > 0]
     # consider edge case where there are no counts
     if counts.size == 0:
         return np.nan
 
-    
     proportions = counts / counts.sum()
-    return -np.sum(proportions * np.log(proportions)) 
-    
-    
+    return -np.sum(proportions * np.log(proportions))
+
 
 def simpson_diversity(counts: np.ndarray) -> float:
     """
@@ -59,8 +63,7 @@ def simpson_diversity(counts: np.ndarray) -> float:
 
     # account for negative abundance values
     if np.any(counts < 0):
-        raise ValueError("Negative abundance values are not allowed in diversity calculations")
-    
+        raise ValueError("Negative abundance values are not allowed")
 
     counts = counts[counts > 0]
     proportions = counts / counts.sum()
@@ -68,16 +71,20 @@ def simpson_diversity(counts: np.ndarray) -> float:
     # consider edge case where there are no counts
     if counts.size == 0:
         return np.nan
-    
-    proportions = counts / counts.sum()
-    return float(1.0 - np.sum(proportions ** 2))
-    
-def pielou_evenness(counts: np.ndarray) -> float:
-    '''
-    Pielou's evenness measures how evenly the species are distributed in a sample.
-    It ranges from 0 (no evenness i.e. no dominance by one species) to 1 (perfect evenness).
 
-    Formula: J' = H' / ln(S) where H' is the Shannon diversity index and S is the number of species.
+    proportions = counts / counts.sum()
+    return float(1.0 - np.sum(proportions**2))
+
+
+def pielou_evenness(counts: np.ndarray) -> float:
+    """
+    Pielou's evenness measures how evenly the species are distributed
+    in a sample.
+    It ranges from 0 (no evenness i.e. no dominance by one species) to
+    1 (perfect evenness).
+
+    Formula: J' = H' / ln(S) where H' is the Shannon diversity index and
+    S is the number of species.
 
     Args:
         counts: Array of abundance values for each taxon in a sample
@@ -87,20 +94,20 @@ def pielou_evenness(counts: np.ndarray) -> float:
 
     Raises:
         ValueError: If any count value is negative
-    '''
+    """
     counts = np.asarray(counts, dtype=float)
 
     # account for negative abundance values
     if np.any(counts < 0):
         raise ValueError("Negative abundance values are not allowed")
-    
+
     if counts.size == 0:
         return np.nan
-    
+
     total = counts.sum()
     if total == 0:
         return np.nan
-    
+
     observed_species = np.count_nonzero(counts)
     # account for when there is only one species
     if observed_species == 1:
@@ -110,13 +117,13 @@ def pielou_evenness(counts: np.ndarray) -> float:
     proportions = counts / total
     # ignore proportions that are too tiny to be considered
     tiny = np.finfo(float).tiny
-    pos_proortions = proportions[proportions > tiny] 
+    pos_proortions = proportions[proportions > tiny]
     # calculate shannon diversity index
-    h_prime = -np.sum(pos_proortions * np.log(pos_proortions)) 
-    
+    h_prime = -np.sum(pos_proortions * np.log(pos_proortions))
+
     if np.isnan(h_prime) or np.isinf(h_prime):
         return np.nan
-    
+
     # calculate maximum diversity
     max_diversity = np.log(observed_species) if observed_species > 1 else 0.0
 
@@ -127,14 +134,17 @@ def pielou_evenness(counts: np.ndarray) -> float:
 
 
 def chao1_estimator(counts: np.ndarray) -> float:
-    '''
+    """
     Calculate Chao1 estimator for species richness.
 
-    Chao1 score is a non-parametric estimation of the number of species in a sample.
-    It is based on the number of observed species and the number of rare species.
+    Chao1 score is a non-parametric estimation of the number of species
+    in a sample.
+    It is based on the number of observed species and the number of rare
+    species.
 
     Formula: Chao1 = S + [(f1(f1 - 1)) / (2(f2 + 1))]
-    where S is the number of observed species, f1 are singletons and f2 are doubletons.
+    where S is the number of observed species, f1 are singletons and f2
+    are doubletons.
 
     Args:
         counts: Array of abundance values for each taxon in a sample
@@ -142,9 +152,9 @@ def chao1_estimator(counts: np.ndarray) -> float:
     Returns:
         Chao1 estimator value, or NaN for edge cases
 
-    Raises: 
+    Raises:
         ValueError: If any count value is negative
-    '''
+    """
     counts = np.asarray(counts, dtype=float)
 
     # account for negative abundance values
@@ -156,7 +166,7 @@ def chao1_estimator(counts: np.ndarray) -> float:
     S = np.count_nonzero(counts)
     if S == 0:
         return 0.0
-    
+
     f1 = np.count_nonzero(counts == 1)
     f2 = np.count_nonzero(counts == 2)
 
@@ -164,5 +174,121 @@ def chao1_estimator(counts: np.ndarray) -> float:
         return float(S)
     if f2 == 0:
         return float(S) + (f1 * (f1 - 1)) / 2.0
-    
+
     return float(S) + (f1 * (f1 - 1)) / (2.0 * (f2 + 1))
+
+
+def calculate_alpha_diversity(
+    data: MicrobiomeData,
+    metrics: List[str] = ["shannon", "simpson", "pielou", "chao1"],
+) -> Dict[str, float]:
+    """
+    Calculate alpha diversity metrics for each sample
+
+    Args:
+        data: MicrobiomeData object containing abundance matrix
+        metrics: List of alpha diversity metrics to calculate
+
+    Returns:
+        Dictionary of alpha diversity metrics for each sample
+
+    Raises:
+        ValueError: If any unsupported metric is provided
+    """
+
+    counts_matrix = np.array(data.counts_matrix)
+    sample_ids = data.sample_ids
+
+    results = {}
+
+    for metric in metrics:
+        metric_results = {}
+        # Iterate over each column in the counts matrix
+        for j, sample_id in enumerate(sample_ids):
+            sample_counts = counts_matrix[:, j]
+            if metric == "shannon":
+                alpha_diversity_value = shannon_diversity(sample_counts)
+            elif metric == "simpson":
+                alpha_diversity_value = simpson_diversity(sample_counts)
+            elif metric == "pielou":
+                alpha_diversity_value = pielou_evenness(sample_counts)
+            elif metric == "chao1":
+                alpha_diversity_value = chao1_estimator(sample_counts)
+            else:
+                raise ValueError(f"Unsupported metric: {metric}")
+
+            metric_results[sample_id] = alpha_diversity_value
+
+        results[metric] = metric_results
+
+    return results
+
+
+def calculate_beta_diversity(
+    data: MicrobiomeData,
+    metrics: List[str] = [
+        "braycurtis",
+        "jaccard",
+    ],  # ["braycurtis", "jaccard", "morisita"]
+) -> Dict[str, float]:
+    """
+    Calculate beta diversity distance matrices between samples
+
+    Args:
+        data: MicrobiomeData object containing abundance matrix
+        metrics: List of beta diversity metrics to calculate
+
+    Returns:
+        Dictionary of beta diversity distance matrices for each sample
+
+    Raises:
+        ValueError: If any unsupported metric is provided
+    """
+
+    counts_matrix = np.array(data.counts_matrix)
+    results = {}
+
+    for metric in metrics:
+        if metric == "braycurtis":
+            dist = distance.pdist(counts_matrix, metric="braycurtis")
+            results[metric] = distance.squareform(dist)
+        elif metric == "jaccard":
+            binary_matrix = (counts_matrix > 0).astype(float)
+            dist = distance.pdist(binary_matrix, metric="jaccard")
+            results[metric] = distance.squareform(dist)
+        else:
+            raise ValueError(f"Unsupported metric: {metric}")
+
+        results[metric] = dist.tolist()
+
+    return results
+
+
+def run_diversity_analysis(
+    data: MicrobiomeData, metrics: List[str] = ["shannon", "simpson", "pielou", "chao1"]
+) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float]]:
+    """
+    Run a full diversity analysis on the provided microbiome data.
+
+    This function orchestrates the complete diversity analysis workflow by:
+    1. Calculating alpha diversity metrics for each sample
+    2. Computing beta diversity distance matrices between samples
+    TODO: 3. Performing statistical comparisons between groups if metadata
+    is provided
+
+    Args:
+        data: MicrobiomeData object containing abundance matrix and metadata
+        metrics: List of alpha diversity metrics to calculate
+        group_by: Optional metadata column to group samples by for comparison
+
+    Returns:
+        Tuple of (alpha_diversity, beta_diversity, group_comparison) results
+    """
+
+    alpha_diversity = calculate_alpha_diversity(data, metrics)
+    # TODO: beta_diversity = calculate_beta_diversity(data)
+    beta_diversity = calculate_beta_diversity(data)
+    # TODO: group_comparison = calculate_group_comparison(data)
+    group_comparison = {}
+
+    return alpha_diversity, beta_diversity, group_comparison
