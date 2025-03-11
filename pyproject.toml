@@ -11,10 +11,16 @@ dependencies = [
     "numpy",
     "pandas",
     "scipy",
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "httpx",
+    "python-multipart"
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
     "scikit-bio",
+    
 ]
