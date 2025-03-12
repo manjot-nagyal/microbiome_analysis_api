@@ -1,11 +1,10 @@
-from fastapi import APIRouter, File, UploadFile, HTTPException
+import logging
 from typing import Optional
 
-import logging
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.models.schemas import MicrobiomeData
 from app.utils.parsers import parse_csv_data
-
 
 logger = logging.getLogger(__name__)
 

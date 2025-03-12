@@ -1,12 +1,11 @@
 import numpy as np
 import pytest
-from scipy.spatial import distance
-
 
 from app.models.schemas import MicrobiomeData
 from app.services.diversity_analysis import (
     calculate_alpha_diversity,
     calculate_beta_diversity,
+    calculate_group_comparison,
 )
 
 
@@ -27,7 +26,7 @@ def sample_data():
             "sample2": {"group": "A", "age": 30, "sex": "F"},
             "sample3": {"group": "B", "age": 28, "sex": "M"},
             "sample4": {"group": "B", "age": 32, "sex": "F"},
-            "sample5": {"group": "C", "age": 25, "sex": "M"},
+            "sample5": {"group": "A", "age": 25, "sex": "M"},
         },
     )
 
@@ -55,19 +54,43 @@ def test_calculate_beta_diversity(sample_data):
     metrics = ["braycurtis", "jaccard"]
     results = calculate_beta_diversity(sample_data, metrics)
 
-    for metric, matrix in results.items():
+    for metric, square_matrix in results.items():
         # Check that there are results for every metric
         assert metric in results
-        # Account for the size of the matrix matrches that of the number of features
-        square_matrix = distance.squareform(results[metric])
-        assert len(square_matrix) == len(sample_data.feature_ids)
-        for row in square_matrix:
-            assert len(row) == len(sample_data.feature_ids)
 
+        # Account for the size of the matrix matrches that of the number of samples
+        for row in square_matrix:
+            assert len(row) == len(sample_data.sample_ids)
+
+        square_matrix_np = np.array(square_matrix)
         # Check that the matrix is symmetric
-        assert np.allclose(square_matrix, square_matrix.T)
+        assert np.allclose(square_matrix_np, square_matrix_np.T)
 
         # Check that the diagonal is 0 (distance to self)
         assert np.allclose(
-            np.diag(square_matrix), np.zeros(len(sample_data.feature_ids))
+            np.diag(square_matrix), np.zeros(len(sample_data.sample_ids))
         )
+
+
+def test_calculate_group_comparison(sample_data):
+    """
+    Test the group comparison calculation
+    """
+    alpha_diversity_metrics = calculate_alpha_diversity(sample_data)
+    results = calculate_group_comparison(sample_data, "group", alpha_diversity_metrics)
+
+    assert "shannon" in results
+    assert "simpson" in results
+    assert "pielou" in results
+    assert "chao1" in results
+
+    for comparison in results.values():
+        assert "A_vs_B" in comparison
+
+        comparison = comparison["A_vs_B"]
+
+        assert "p_value" in comparison
+        assert "statistic" in comparison
+        assert "significant" in comparison
+        assert "A_mean" in comparison
+        assert "B_mean" in comparison

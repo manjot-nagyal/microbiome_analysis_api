@@ -20,3 +20,14 @@ dependencies = [
     "pytest",
     "scikit-bio",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "isort",
+    "black",
+    "flake8",
+]
+
+[tool.black]
+line-length = 88

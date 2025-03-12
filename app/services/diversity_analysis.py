@@ -1,7 +1,9 @@
-from typing import List, Tuple, Dict
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+from scipy import stats
 from scipy.spatial import distance
+
 from app.models.schemas import MicrobiomeData
 
 
@@ -229,8 +231,8 @@ def calculate_beta_diversity(
     metrics: List[str] = [
         "braycurtis",
         "jaccard",
-    ],  # ["braycurtis", "jaccard", "morisita"]
-) -> Dict[str, float]:
+    ],
+) -> Dict[str, List[List[float]]]:
     """
     Calculate beta diversity distance matrices between samples
 
@@ -245,35 +247,115 @@ def calculate_beta_diversity(
         ValueError: If any unsupported metric is provided
     """
 
-    counts_matrix = np.array(data.counts_matrix)
+    counts_matrix = np.array(data.counts_matrix).T
     results = {}
 
     for metric in metrics:
         if metric == "braycurtis":
             dist = distance.pdist(counts_matrix, metric="braycurtis")
-            results[metric] = distance.squareform(dist)
+            results[metric] = distance.squareform(dist).tolist()
         elif metric == "jaccard":
             binary_matrix = (counts_matrix > 0).astype(float)
             dist = distance.pdist(binary_matrix, metric="jaccard")
-            results[metric] = distance.squareform(dist)
+            results[metric] = distance.squareform(dist).tolist()
         else:
             raise ValueError(f"Unsupported metric: {metric}")
-
-        results[metric] = dist.tolist()
 
     return results
 
 
+def calculate_group_comparison(
+    data: MicrobiomeData,
+    group_by: str,
+    diversity_metrics: Dict[str, Dict[str, float]],
+) -> Optional[Dict[str, Dict[str, Dict[str, float]]]]:
+    """
+    Compare alpha diversity metrics between groups using statistical tests.
+
+    This function performs pairwise comparisons between sample groups
+    using Mann-Whitney U test. This will determine if diversity differs
+    significantly between groups.
+
+    Args:
+        data: MicrobiomeData object containing abundance matrix and metadata
+        group_by: Metadata column to group samples by for comparison
+        diversity_metrics: Dictionary of alpha diversity metrics for each sample
+    Returns:
+        Dictionary of group comparison results for each alpha diversity metric
+    """
+
+    if not data.metadata or not group_by:
+        return None
+
+    groups: Dict[str, List[str]] = {}
+
+    for sample_id in data.sample_ids:
+        if sample_id in data.metadata and group_by in data.metadata[sample_id]:
+            group_value = data.metadata[sample_id][group_by]
+            if group_value not in groups:
+                groups[group_value] = []
+            groups[group_value].append(sample_id)
+
+    if len(groups) < 2:
+        return None
+
+    group_comparison = {}
+
+    for metric, values in diversity_metrics.items():
+        metric_results = {}
+
+        group_keys = list(groups.keys())
+        for i in range(len(group_keys)):
+            for j in range(i + 1, len(group_keys)):
+                group_a = str(group_keys[i])
+                group_b = str(group_keys[j])
+                group_a_values = [
+                    values[sample_id]
+                    for sample_id in groups[group_a]
+                    if sample_id in values
+                ]
+                group_b_values = [
+                    values[sample_id]
+                    for sample_id in groups[group_b]
+                    if sample_id in values
+                ]
+
+                if len(group_a_values) < 1 or len(group_b_values) < 1:
+                    continue
+
+                stat, p_value = stats.mannwhitneyu(group_a_values, group_b_values)
+
+                comparison_key = f"{group_a}_vs_{group_b}"
+
+                metric_results[comparison_key] = {
+                    "p_value": float(p_value),
+                    "statistic": float(stat),
+                    "significant": p_value < 0.05,
+                    f"{group_a}_mean": np.mean(group_a_values),
+                    f"{group_b}_mean": np.mean(group_b_values),
+                }
+
+        group_comparison[metric] = metric_results
+
+    return group_comparison
+
+
 def run_diversity_analysis(
-    data: MicrobiomeData, metrics: List[str] = ["shannon", "simpson", "pielou", "chao1"]
-) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float]]:
+    data: MicrobiomeData,
+    metrics: List[str] = ["shannon", "simpson", "pielou", "chao1"],
+    group_by: Optional[str] = None,
+) -> Tuple[
+    Dict[str, Dict[str, float]],
+    Dict[str, List[List[float]]],
+    Optional[Dict[str, Dict[str, Dict[str, float]]]],
+]:
     """
     Run a full diversity analysis on the provided microbiome data.
 
     This function orchestrates the complete diversity analysis workflow by:
     1. Calculating alpha diversity metrics for each sample
     2. Computing beta diversity distance matrices between samples
-    TODO: 3. Performing statistical comparisons between groups if metadata
+    3. Performing statistical comparisons between groups if metadata
     is provided
 
     Args:
@@ -286,9 +368,9 @@ def run_diversity_analysis(
     """
 
     alpha_diversity = calculate_alpha_diversity(data, metrics)
-    # TODO: beta_diversity = calculate_beta_diversity(data)
+
     beta_diversity = calculate_beta_diversity(data)
-    # TODO: group_comparison = calculate_group_comparison(data)
-    group_comparison = {}
+
+    group_comparison = calculate_group_comparison(data, group_by, alpha_diversity)
 
     return alpha_diversity, beta_diversity, group_comparison

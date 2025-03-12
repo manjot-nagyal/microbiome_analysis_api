@@ -3,10 +3,10 @@ import pytest
 import skbio.diversity.alpha as skbio_alpha
 
 from app.services.diversity_analysis import (
+    chao1_estimator,
+    pielou_evenness,
     shannon_diversity,
     simpson_diversity,
-    pielou_evenness,
-    chao1_estimator,
 )
 
 
@@ -43,7 +43,7 @@ class TestDiversityMetrics:
     def test_shannon_diversity_zero_values(self):
         """Check for zero values"""
         zero_values = np.array([0, 0, 0])
-        expected = np.nan
+        expected = skbio_alpha.shannon(zero_values)
 
         result = shannon_diversity(zero_values)
         assert_alpha_metric(result, expected)
@@ -92,7 +92,7 @@ class TestDiversityMetrics:
     def test_simpson_diversity_zero_values(self):
         """Check for zero values"""
         zero_values = np.array([0, 0, 0])
-        expected = np.nan
+        expected = skbio_alpha.simpson(zero_values)
 
         result = simpson_diversity(zero_values)
         assert_alpha_metric(result, expected)

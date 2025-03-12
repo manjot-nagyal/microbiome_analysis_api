@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.endpoints import upload
+from app.api.endpoints import diversity, upload
 
 app = FastAPI(
     title="Microbiome Analysis API",
@@ -9,3 +9,4 @@ app = FastAPI(
 )
 
 app.include_router(upload.router, prefix="/upload")
+app.include_router(diversity.router, prefix="/diversity")
