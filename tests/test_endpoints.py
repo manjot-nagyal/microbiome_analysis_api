@@ -4,7 +4,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.models.schemas import DiversityAnalysisRequest, MicrobiomeData
+from app.models.schemas import (
+    CorrelationAnalysisRequest,
+    DiversityAnalysisRequest,
+    MicrobiomeData,
+)
 
 client = TestClient(app)
 
@@ -193,7 +197,6 @@ def test_analyze_diversity(sample_data):
 def test_error_handling(json_data):
     """Test error handling in the API."""
 
-    # Test invalid diversity metric
     client.post(
         "/upload/",
         data={"json_data": json.dumps(json_data), "normalize": "true"},
@@ -204,3 +207,191 @@ def test_error_handling(json_data):
         json={"request": {"metrics": ["invalid_metric"]}, "data": json_data},
     )
     assert response.status_code == 400
+
+
+def test_correlation_analyze_basic(sample_data):
+    """Test basic correlation analysis with default parameters."""
+
+    upload_response = client.post(
+        "/upload/",
+        data={"json_data": json.dumps(sample_data.model_dump()), "normalize": "true"},
+    )
+    assert upload_response.status_code == 200
+
+    request = CorrelationAnalysisRequest()
+
+    response = client.post(
+        "/correlation/analyze", json={"request": request.model_dump()}
+    )
+
+    assert response.status_code == 200
+
+    result = response.json()
+    assert "taxon_correlations" in result
+    assert "p_values" in result
+    assert "filtered_taxa" in result
+
+    for taxon in sample_data.feature_ids:
+        if taxon in result["filtered_taxa"]:
+            assert taxon in result["taxon_correlations"]
+            assert len(result["taxon_correlations"][taxon]) > 0
+
+
+def test_correlation_analyze_methods(sample_data):
+    """Test correlation analysis with different correlation methods."""
+
+    upload_response = client.post(
+        "/upload/",
+        data={"json_data": json.dumps(sample_data.model_dump()), "normalize": "true"},
+    )
+    assert upload_response.status_code == 200
+
+    for method in ["pearson", "spearman", "kendall"]:
+        request = CorrelationAnalysisRequest(correlation_method=method)
+
+        response = client.post(
+            "/correlation/analyze", json={"request": request.model_dump()}
+        )
+
+        assert response.status_code == 200
+        result = response.json()
+
+        assert "taxon_correlations" in result
+        assert "p_values" in result
+        assert "filtered_taxa" in result
+
+
+def test_correlation_analyze_with_metadata(sample_data):
+    """Test correlation analysis including metadata variables."""
+
+    upload_response = client.post(
+        "/upload/",
+        data={"json_data": json.dumps(sample_data.model_dump()), "normalize": "true"},
+    )
+    assert upload_response.status_code == 200
+
+    request = CorrelationAnalysisRequest(
+        correlation_method="spearman", metadata_columns=["age", "sex"]
+    )
+
+    response = client.post("/correlation/analyze", json=request.model_dump())
+
+    assert response.status_code == 200
+    result = response.json()
+
+    assert "metadata_correlations" in result
+
+    for taxon in result["filtered_taxa"]:
+        assert (
+            taxon in result["metadata_correlations"]
+        ), f"Taxon {taxon} should have metadata correlations"
+        metadata_corrs = result["metadata_correlations"][taxon]
+        assert any(col in metadata_corrs for col in ["age", "sex"])
+
+
+def test_correlation_analyze_filtering(sample_data):
+    """Test correlation analysis with different abundance and prevalence thresholds."""
+
+    upload_response = client.post(
+        "/upload/",
+        data={"json_data": json.dumps(sample_data.model_dump()), "normalize": "true"},
+    )
+    assert upload_response.status_code == 200
+
+    request = CorrelationAnalysisRequest(min_abundance=0.3, min_prevalence=0.6)
+
+    response = client.post("/correlation/analyze", json=request.model_dump())
+
+    assert response.status_code == 200
+    result = response.json()
+
+    assert len(result["filtered_taxa"]) <= len(sample_data.feature_ids)
+
+    request = CorrelationAnalysisRequest(min_abundance=0.01, min_prevalence=0.01)
+
+    response = client.post("/correlation/analyze", json=request.model_dump())
+
+    assert response.status_code == 200
+    result = response.json()
+
+    assert len(result["filtered_taxa"]) >= 1
+
+
+def test_correlation_analyze_with_zeros_and_nans(sample_data_with_nan):
+    """Test correlation analysis with data containing zeros and potential NaN values."""
+
+    upload_response = client.post(
+        "/upload/",
+        data={
+            "json_data": json.dumps(sample_data_with_nan.model_dump()),
+            "normalize": "true",
+        },
+    )
+    assert upload_response.status_code == 200
+
+    request = CorrelationAnalysisRequest(
+        correlation_method="spearman", min_abundance=0.01, min_prevalence=0.01
+    )
+
+    response = client.post("/correlation/analyze", json=request.model_dump())
+
+    assert response.status_code == 200
+
+    result = response.json()
+    assert "taxon_correlations" in result
+    assert "p_values" in result
+    assert "filtered_taxa" in result
+
+
+def test_correlation_analyze_invalid_method():
+    """Test correlation analysis with an invalid correlation method."""
+
+    data = MicrobiomeData(
+        sample_ids=["sample1", "sample2"],
+        feature_ids=["taxon1", "taxon2"],
+        counts_matrix=[[0.5, 0.5], [0.5, 0.5]],
+        metadata={"sample1": {"group": "A"}, "sample2": {"group": "B"}},
+    )
+
+    upload_response = client.post(
+        "/upload/",
+        data={"json_data": json.dumps(data.model_dump()), "normalize": "true"},
+    )
+    assert upload_response.status_code == 200
+
+    request = CorrelationAnalysisRequest(correlation_method="invalid_method")
+
+    response = client.post("/correlation/analyze", json=request.model_dump())
+
+    assert response.status_code == 400
+    assert "Unsupported correlation method" in response.json()["detail"]
+
+
+def test_correlation_analyze_invalid_metadata_columns(sample_data):
+    """Test correlation analysis with invalid metadata columns."""
+
+    upload_response = client.post(
+        "/upload/",
+        data={"json_data": json.dumps(sample_data.model_dump()), "normalize": "true"},
+    )
+    assert upload_response.status_code == 200
+
+    request = CorrelationAnalysisRequest(metadata_columns=["nonexistent_column"])
+
+    response = client.post("/correlation/analyze", json=request.model_dump())
+
+    assert response.status_code == 400
+    assert "Unknown metadata columns" in response.json()["detail"]
+
+
+def test_correlation_analyze_no_data():
+    """Test correlation analysis without first uploading data."""
+
+    client.post("/upload/current")
+
+    request = CorrelationAnalysisRequest()
+
+    response = client.post("/correlation/analyze", json=request.model_dump())
+
+    assert response.status_code == 400
+    assert "No microbiome data available" in response.json()["detail"]
