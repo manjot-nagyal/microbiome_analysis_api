@@ -21,6 +21,12 @@ dependencies = [
     "scikit-bio",
     "uvicorn",
     "hypothesis",
+    "streamlit",
+    "matplotlib",
+    "seaborn",
+    "plotly",
+    "networkx",
+    "scikit-learn",
 ]
 
 [project.optional-dependencies]
@@ -36,3 +42,8 @@ line-length = 88
 
 [tool.setuptools]
 packages = ["app"]
+
+[tool.pytest.ini_options]
+markers = [
+    "frontend: mark tests related to the frontend module",
+]

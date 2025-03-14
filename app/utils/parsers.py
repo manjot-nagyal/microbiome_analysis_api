@@ -12,47 +12,65 @@ def parse_csv_data(content_str: str) -> MicrobiomeData:
     """
     Parse the CSV data into a MicrobiomeData object
     """
-
-    df = pd.read_csv(StringIO(content_str), index_col=0)
-
-    print(df)
-
-    # Separate metadata from data
-    metadata_cols = [col for col in df.columns if col.startswith("metadata_")]
-    data_cols = [col for col in df.columns if not col.startswith("metadata_")]
-    sample_ids = df.index.tolist()
-
-    # Extract feature counts
-    counts_df = df[data_cols]
-
-    metadata: Optional[Dict[str, Dict[str, Any]]] = None
-    if metadata_cols:
-        metadata_df = df[metadata_cols]
-        metadata = {}
-
-        for sample_id in df.index:
-            metadata[sample_id] = {}
-            for meta_col in metadata_cols:
-                clean_meta_name = meta_col.replace("metadata_", "")
-                metadata[sample_id][clean_meta_name] = metadata_df.loc[
-                    sample_id, meta_col
-                ]
     try:
-        counts_matrix: List[List[float]] = [
-            [float(val) for val in sample] for sample in counts_df.values
-        ]
-    except ValueError as e:
-        raise ValueError("Error parsing CSV file: " + str(e))
+        try:
+            df = pd.read_csv(
+                StringIO(content_str), index_col=0, na_values=["", "NA", "nan"]
+            )
 
-    # Create MicrobiomeData object
-    microbiome_data = MicrobiomeData(
-        sample_ids=sample_ids,
-        feature_ids=data_cols,
-        counts_matrix=counts_matrix,
-        metadata=metadata,
-    )
+            df = df.dropna(axis=1, how="all")
 
-    return microbiome_data
+            # Separate metadata from data
+            metadata_cols = [col for col in df.columns if col.startswith("metadata_")]
+            data_cols = [col for col in df.columns if not col.startswith("metadata_")]
+            sample_ids = df.index.tolist()
+
+            # Extract feature counts
+            counts_df = df[data_cols]
+
+            metadata: Optional[Dict[str, Dict[str, Any]]] = None
+            if metadata_cols:
+                metadata_df = df[metadata_cols]
+                metadata = {}
+
+                for sample_id in df.index:
+                    metadata[sample_id] = {}
+                    for meta_col in metadata_cols:
+                        clean_meta_name = meta_col.replace("metadata_", "")
+                        value = metadata_df.loc[sample_id, meta_col]
+                        # Skip NaN values in metadata completely
+                        if pd.isna(value):
+                            continue
+                        else:
+                            metadata[sample_id][clean_meta_name] = value
+            try:
+                counts_matrix: List[List[float]] = []
+                for sample in counts_df.values:
+                    sample_values = []
+                    for val in sample:
+
+                        if pd.isna(val):
+                            sample_values.append(0.0)
+                        else:
+                            sample_values.append(float(val))
+                    counts_matrix.append(sample_values)
+            except ValueError as e:
+                raise ValueError("Error parsing CSV file: " + str(e))
+
+            microbiome_data = MicrobiomeData(
+                sample_ids=sample_ids,
+                feature_ids=data_cols,
+                counts_matrix=counts_matrix,
+                metadata=metadata,
+            )
+
+            return microbiome_data
+        except Exception as e:
+            print(f"Error parsing CSV data: {str(e)}")
+            raise
+    except Exception as e:
+        print(f"Error parsing CSV data: {str(e)}")
+        raise
 
 
 def parse_json_data(content: str) -> MicrobiomeData:
@@ -62,8 +80,8 @@ def parse_json_data(content: str) -> MicrobiomeData:
     Expected format:
     {
         "sample_ids": ["sample1", "sample2", ...],
-        "taxonomy_ids": ["taxon1", "taxon2", ...],
-        "abundance_matrix": [[val1, val2, ...], [val1, val2, ...], ...],
+        "feature_ids": ["taxon1", "taxon2", ...],
+        "counts_matrix": [[val1, val2, ...], [val1, val2, ...], ...],
         "metadata": {
             "sample1": {"metadata1": value1, "metadata2": value2, ...},
             "sample2": {"metadata1": value1, "metadata2": value2, ...},
@@ -94,6 +112,8 @@ def normalize_counts(data: MicrobiomeData) -> MicrobiomeData:
     """
 
     counts_matrix = np.array(data.counts_matrix)
+
+    counts_matrix = np.nan_to_num(counts_matrix, nan=0.0)
 
     row_sums = counts_matrix.sum(axis=1, keepdims=True)
 

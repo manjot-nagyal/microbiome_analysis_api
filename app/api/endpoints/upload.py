@@ -40,6 +40,11 @@ async def upload_microbiome_data(
     """
     global current_data
 
+    print(
+        f"Upload request received. File: {file.filename if file else None}, "
+        f"JSON data provided: {json_data is not None}"
+    )
+
     if file is None and json_data is None:
         raise HTTPException(
             status_code=400,
@@ -62,11 +67,11 @@ async def upload_microbiome_data(
             # For CSV files
             if file.filename and file.filename.endswith(".csv"):
                 try:
-                    print(content_str)
+                    print(f"Processing CSV file: {file.filename}")
                     data = parse_csv_data(content_str)
 
                 except Exception as e:
-
+                    print(f"Error parsing CSV file: {str(e)}")
                     raise HTTPException(
                         status_code=400,
                         detail=f"Error parsing CSV file: {str(e)}. "
@@ -76,14 +81,17 @@ async def upload_microbiome_data(
             # For JSON files
             elif file.filename and file.filename.endswith(".json"):
                 try:
+                    print(f"Processing JSON file: {file.filename}")
                     data = parse_json_data(content_str)
                 except json.JSONDecodeError:
+                    print("Invalid JSON format")
                     raise HTTPException(
                         status_code=400,
                         detail="Invalid JSON format. Please ensure "
                         "the file contains valid JSON data.",
                     )
                 except Exception as e:
+                    print(f"Error parsing JSON data: {str(e)}")
                     raise HTTPException(
                         status_code=400,
                         detail=f"Error parsing JSON data: {str(e)}. Please check "
@@ -104,14 +112,17 @@ async def upload_microbiome_data(
                         status_code=400,
                         detail="No JSON data provided. Please provide valid JSON data.",
                     )
+                print("Processing direct JSON data")
                 data = parse_json_data(json_data)
             except json.JSONDecodeError:
+                print("Invalid JSON format")
                 raise HTTPException(
                     status_code=400,
                     detail="Invalid JSON data. Please ensure you are "
                     "submitting valid JSON in the required format.",
                 )
             except Exception as e:
+                print(f"Error parsing JSON data: {str(e)}")
                 raise HTTPException(
                     status_code=400,
                     detail=f"Error parsing JSON data: {str(e)}. Please check "
@@ -119,8 +130,13 @@ async def upload_microbiome_data(
                 )
 
         if normalize:
+            print("Normalizing data")
             data = normalize_counts(data)
 
+        print(
+            f"Successfully processed data. Samples: "
+            f"{len(data.sample_ids)}, Features: {len(data.feature_ids)}"
+        )
         current_data = data
         return data
     except Exception as e:

@@ -27,18 +27,34 @@ def shannon_diversity(counts: np.ndarray) -> float:
     Raises:
         ValueError: If any count value is negative
     """
-    counts = np.asarray(counts, dtype=float)
+    try:
+        counts = np.asarray(counts, dtype=float)
 
-    if np.any(counts < 0):
-        raise ValueError("Negative abundance values are not allowed")
+        print(f"Shannon diversity - Original counts: {counts[:5]}")
+        print(f"Contains NaN: {np.isnan(counts).any()}")
 
-    counts = counts[counts > 0]
+        counts = np.nan_to_num(counts, nan=0.0)
+        print(f"After nan_to_num: {counts[:5]}")
 
-    if counts.size == 0:
-        return np.nan
+        if np.any(counts < 0):
+            raise ValueError("Negative abundance values are not allowed")
 
-    proportions = counts / counts.sum()
-    return -np.sum(proportions * np.log(proportions))
+        counts = counts[counts > 0]
+        print(
+            f"After filtering zeros: {counts[:5] if len(counts) > 0 else 'Empty array'}"
+        )
+
+        if counts.size == 0:
+            print("Shannon diversity: Empty array after filtering, returning NaN")
+            return np.nan
+
+        proportions = counts / counts.sum()
+        result = -np.sum(proportions * np.log(proportions))
+        print(f"Shannon diversity result: {result}")
+        return result
+    except Exception as e:
+        print(f"Error in shannon_diversity: {str(e)}")
+        raise
 
 
 def simpson_diversity(counts: np.ndarray) -> float:
@@ -60,19 +76,39 @@ def simpson_diversity(counts: np.ndarray) -> float:
     Raises:
         ValueError: If any count value is negative
     """
-    counts = np.asarray(counts, dtype=float)
+    try:
+        counts = np.asarray(counts, dtype=float)
 
-    if np.any(counts < 0):
-        raise ValueError("Negative abundance values are not allowed")
+        print(f"Simpson diversity - Original counts: {counts[:5]}")
+        print(f"Contains NaN: {np.isnan(counts).any()}")
 
-    counts = counts[counts > 0]
-    proportions = counts / counts.sum()
+        counts = np.nan_to_num(counts, nan=0.0)
+        print(f"After nan_to_num: {counts[:5]}")
 
-    if counts.size == 0:
-        return np.nan
+        if np.any(counts < 0):
+            raise ValueError("Negative abundance values are not allowed")
 
-    proportions = counts / counts.sum()
-    return float(1.0 - np.sum(proportions**2))
+        counts = counts[counts > 0]
+        print(
+            f"After filtering zeros: {counts[:5] if len(counts) > 0 else 'Empty array'}"
+        )
+
+        if counts.size == 0:
+            print("Simpson diversity: Empty array after filtering, returning NaN")
+            return np.nan
+
+        total = counts.sum()
+        if total == 0:
+            print("Simpson diversity: Total is zero, returning NaN")
+            return np.nan
+
+        proportions = counts / total
+        result = float(1.0 - np.sum(proportions**2))
+        print(f"Simpson diversity result: {result}")
+        return result
+    except Exception as e:
+        print(f"Error in simpson_diversity: {str(e)}")
+        raise
 
 
 def pielou_evenness(counts: np.ndarray) -> float:
@@ -94,39 +130,59 @@ def pielou_evenness(counts: np.ndarray) -> float:
     Raises:
         ValueError: If any count value is negative
     """
-    counts = np.asarray(counts, dtype=float)
+    try:
+        counts = np.asarray(counts, dtype=float)
 
-    if np.any(counts < 0):
-        raise ValueError("Negative abundance values are not allowed")
+        print(f"Pielou evenness - Original counts: {counts[:5]}")
+        print(f"Contains NaN: {np.isnan(counts).any()}")
 
-    if counts.size == 0:
-        return np.nan
+        counts = np.nan_to_num(counts, nan=0.0)
+        print(f"After nan_to_num: {counts[:5]}")
 
-    total = counts.sum()
-    if total == 0:
-        return np.nan
+        if np.any(counts < 0):
+            raise ValueError("Negative abundance values are not allowed")
 
-    observed_species = np.count_nonzero(counts)
+        if counts.size == 0:
+            print("Pielou evenness: Empty array, returning NaN")
+            return np.nan
 
-    if observed_species == 1:
-        return 1.0
+        total = counts.sum()
+        if total == 0:
+            print("Pielou evenness: Total is zero, returning NaN")
+            return np.nan
 
-    proportions = counts / total
-    # ignore proportions that are too tiny to be considered
-    tiny = np.finfo(float).tiny
-    pos_proortions = proportions[proportions > tiny]
-    # calculate shannon diversity index
-    h_prime = -np.sum(pos_proortions * np.log(pos_proortions))
+        observed_species = np.count_nonzero(counts)
+        print(f"Observed species: {observed_species}")
 
-    if np.isnan(h_prime) or np.isinf(h_prime):
-        return np.nan
+        if observed_species == 1:
+            print("Pielou evenness: Only one species, returning 1.0")
+            return 1.0
 
-    max_diversity = np.log(observed_species) if observed_species > 1 else 0.0
+        proportions = counts / total
+        # ignore proportions that are too tiny to be considered
+        tiny = np.finfo(float).tiny
+        pos_proortions = proportions[proportions > tiny]
+        # calculate shannon diversity index
+        h_prime = -np.sum(pos_proortions * np.log(pos_proortions))
+        print(f"Shannon diversity (h_prime): {h_prime}")
 
-    if h_prime == 0.0 or max_diversity == 0.0:
-        return 0.0
+        if np.isnan(h_prime) or np.isinf(h_prime):
+            print("Pielou evenness: h_prime is NaN or Inf, returning NaN")
+            return np.nan
 
-    return h_prime / max_diversity
+        max_diversity = np.log(observed_species) if observed_species > 1 else 0.0
+        print(f"Max diversity: {max_diversity}")
+
+        if h_prime == 0.0 or max_diversity == 0.0:
+            print("Pielou evenness: h_prime or max_diversity is zero, returning 0.0")
+            return 0.0
+
+        result = h_prime / max_diversity
+        print(f"Pielou evenness result: {result}")
+        return result
+    except Exception as e:
+        print(f"Error in pielou_evenness: {str(e)}")
+        raise
 
 
 def chao1_estimator(counts: np.ndarray) -> float:
@@ -151,26 +207,48 @@ def chao1_estimator(counts: np.ndarray) -> float:
     Raises:
         ValueError: If any count value is negative
     """
-    counts = np.asarray(counts, dtype=float)
+    try:
+        counts = np.asarray(counts, dtype=float)
 
-    if np.any(counts < 0):
-        raise ValueError("Negative abundance values are not allowed")
-    if counts.size == 0:
-        return np.nan
-    counts = counts[counts > 0]
-    S = np.count_nonzero(counts)
-    if S == 0:
-        return 0.0
+        print(f"Chao1 estimator - Original counts: {counts[:5]}")
+        print(f"Contains NaN: {np.isnan(counts).any()}")
 
-    f1 = np.count_nonzero(counts == 1)
-    f2 = np.count_nonzero(counts == 2)
+        counts = np.nan_to_num(counts, nan=0.0)
+        print(f"After nan_to_num: {counts[:5]}")
 
-    if f1 == 0:
-        return float(S)
-    if f2 == 0:
-        return float(S) + (f1 * (f1 - 1)) / 2.0
+        if np.any(counts < 0):
+            raise ValueError("Negative abundance values are not allowed")
+        if counts.size == 0:
+            print("Chao1 estimator: Empty array, returning NaN")
+            return np.nan
+        counts = counts[counts > 0]
+        print(
+            f"After filtering zeros: {counts[:5] if len(counts) > 0 else 'Empty array'}"
+        )
 
-    return float(S) + (f1 * (f1 - 1)) / (2.0 * (f2 + 1))
+        S = np.count_nonzero(counts)
+        if S == 0:
+            print("Chao1 estimator: S is zero, returning 0.0")
+            return 0.0
+
+        f1 = np.count_nonzero(counts == 1)
+        f2 = np.count_nonzero(counts == 2)
+        print(f"S: {S}, f1: {f1}, f2: {f2}")
+
+        if f1 == 0:
+            print("Chao1 estimator: f1 is zero, returning S: {S}")
+            return float(S)
+        if f2 == 0:
+            result = float(S) + (f1 * (f1 - 1)) / 2.0
+            print(f"Chao1 estimator (f2=0): {result}")
+            return result
+
+        result = float(S) + (f1 * (f1 - 1)) / (2.0 * (f2 + 1))
+        print(f"Chao1 estimator result: {result}")
+        return result
+    except Exception as e:
+        print(f"Error in chao1_estimator: {str(e)}")
+        raise
 
 
 def calculate_alpha_diversity(
@@ -190,33 +268,44 @@ def calculate_alpha_diversity(
     Raises:
         ValueError: If any unsupported metric is provided
     """
+    try:
+        print("Starting alpha diversity calculation")
+        counts_matrix = np.array(data.counts_matrix)
+        sample_ids = data.sample_ids
 
-    counts_matrix = np.array(data.counts_matrix)
-    sample_ids = data.sample_ids
+        print(f"Counts matrix shape: {counts_matrix.shape}")
+        print(f"Sample IDs: {sample_ids[:5]}...")
 
-    results = {}
+        results = {}
 
-    for metric in metrics:
-        metric_results = {}
+        for metric in metrics:
+            print(f"Calculating {metric} diversity")
+            metric_results = {}
 
-        for j, sample_id in enumerate(sample_ids):
-            sample_counts = counts_matrix[j, :]
-            if metric == "shannon":
-                alpha_diversity_value = shannon_diversity(sample_counts)
-            elif metric == "simpson":
-                alpha_diversity_value = simpson_diversity(sample_counts)
-            elif metric == "pielou":
-                alpha_diversity_value = pielou_evenness(sample_counts)
-            elif metric == "chao1":
-                alpha_diversity_value = chao1_estimator(sample_counts)
-            else:
-                raise ValueError(f"Unsupported metric: {metric}")
+            for j, sample_id in enumerate(sample_ids):
+                print(f"Processing sample {j+1}/{len(sample_ids)}: {sample_id}")
+                sample_counts = counts_matrix[j, :]
 
-            metric_results[sample_id] = alpha_diversity_value
+                if metric == "shannon":
+                    alpha_diversity_value = shannon_diversity(sample_counts)
+                elif metric == "simpson":
+                    alpha_diversity_value = simpson_diversity(sample_counts)
+                elif metric == "pielou":
+                    alpha_diversity_value = pielou_evenness(sample_counts)
+                elif metric == "chao1":
+                    alpha_diversity_value = chao1_estimator(sample_counts)
+                else:
+                    raise ValueError(f"Unsupported metric: {metric}")
 
-        results[metric] = metric_results
+                metric_results[sample_id] = alpha_diversity_value
 
-    return results
+            results[metric] = metric_results
+            print(f"Completed {metric} diversity calculation")
+
+        return results
+    except Exception as e:
+        print(f"Error in calculate_alpha_diversity: {str(e)}")
+        raise
 
 
 def calculate_beta_diversity(
@@ -239,22 +328,33 @@ def calculate_beta_diversity(
     Raises:
         ValueError: If any unsupported metric is provided
     """
+    try:
+        print("Starting beta diversity calculation")
+        counts_matrix = np.array(data.counts_matrix)
 
-    counts_matrix = np.array(data.counts_matrix)
-    results = {}
+        print(f"Beta diversity - Contains NaN: {np.isnan(counts_matrix).any()}")
 
-    for metric in metrics:
-        if metric == "braycurtis":
-            dist = distance.pdist(counts_matrix, metric="braycurtis")
-            results[metric] = distance.squareform(dist).tolist()
-        elif metric == "jaccard":
-            binary_matrix = (counts_matrix > 0).astype(float)
-            dist = distance.pdist(binary_matrix, metric="jaccard")
-            results[metric] = distance.squareform(dist).tolist()
-        else:
-            raise ValueError(f"Unsupported metric: {metric}")
+        counts_matrix = np.nan_to_num(counts_matrix, nan=0.0)
 
-    return results
+        results = {}
+
+        for metric in metrics:
+            print(f"Calculating {metric} beta diversity")
+            if metric == "braycurtis":
+                dist = distance.pdist(counts_matrix, metric="braycurtis")
+                results[metric] = distance.squareform(dist).tolist()
+            elif metric == "jaccard":
+                binary_matrix = (counts_matrix > 0).astype(float)
+                dist = distance.pdist(binary_matrix, metric="jaccard")
+                results[metric] = distance.squareform(dist).tolist()
+            else:
+                raise ValueError(f"Unsupported metric: {metric}")
+            print(f"Completed {metric} beta diversity calculation")
+
+        return results
+    except Exception as e:
+        print(f"Error in calculate_beta_diversity: {str(e)}")
+        raise
 
 
 def calculate_group_comparison(
@@ -276,61 +376,96 @@ def calculate_group_comparison(
     Returns:
         Dictionary of group comparison results for each alpha diversity metric
     """
+    try:
+        print("Starting group comparison calculation")
+        if not data.metadata or group_by is None:
+            print("No metadata or group_by provided, skipping group comparison")
+            return None
 
-    if not data.metadata or not group_by:
-        return None
+        groups: Dict[str, List[str]] = {}
 
-    groups: Dict[str, List[str]] = {}
+        for sample_id in data.sample_ids:
+            if sample_id in data.metadata and group_by in data.metadata[sample_id]:
+                group_value = data.metadata[sample_id][group_by]
 
-    for sample_id in data.sample_ids:
-        if sample_id in data.metadata and group_by in data.metadata[sample_id]:
-            group_value = data.metadata[sample_id][group_by]
-            if group_value not in groups:
-                groups[group_value] = []
-            groups[group_value].append(sample_id)
-
-    if len(groups) < 2:
-        return None
-
-    group_comparison = {}
-
-    for metric, values in diversity_metrics.items():
-        metric_results = {}
-
-        group_keys = list(groups.keys())
-        for i in range(len(group_keys)):
-            for j in range(i + 1, len(group_keys)):
-                group_a = str(group_keys[i])
-                group_b = str(group_keys[j])
-                group_a_values = [
-                    values[sample_id]
-                    for sample_id in groups[group_a]
-                    if sample_id in values
-                ]
-                group_b_values = [
-                    values[sample_id]
-                    for sample_id in groups[group_b]
-                    if sample_id in values
-                ]
-
-                if len(group_a_values) < 1 or len(group_b_values) < 1:
+                # Skip NaN values or None values in metadata
+                if group_value is None or (
+                    isinstance(group_value, float) and np.isnan(group_value)
+                ):
+                    print(f"Skipping sample {sample_id} due to None/NaN group value")
                     continue
 
-                stat, p_value = stats.mannwhitneyu(group_a_values, group_b_values)
+                # Convert group value to string to ensure it works as a dictionary key
+                group_value = str(group_value)
 
-                comparison_key = f"{group_a}_vs_{group_b}"
+                if group_value not in groups:
+                    groups[group_value] = []
+                groups[group_value].append(sample_id)
 
-                metric_results[comparison_key] = {
-                    "p_value": float(p_value),
-                    "statistic": float(stat),
-                    "significant": p_value < 0.05,
-                    f"{group_a}_mean": np.mean(group_a_values),
-                    f"{group_b}_mean": np.mean(group_b_values),
-                }
+        print(f"Found {len(groups)} groups: {list(groups.keys())}")
+        if len(groups) < 2:
+            print("Less than 2 groups found, skipping group comparison")
+            return None
 
-        group_comparison[metric] = metric_results
+        group_comparison = {}
 
-    return group_comparison
+        for metric, values in diversity_metrics.items():
+            print(f"Comparing groups for {metric}")
+            metric_results = {}
+
+            group_keys = list(groups.keys())
+            for i in range(len(group_keys)):
+                for j in range(i + 1, len(group_keys)):
+                    group_a = str(group_keys[i])
+                    group_b = str(group_keys[j])
+                    group_a_values = [
+                        values[sample_id]
+                        for sample_id in groups[group_a]
+                        if sample_id in values
+                    ]
+                    group_b_values = [
+                        values[sample_id]
+                        for sample_id in groups[group_b]
+                        if sample_id in values
+                    ]
+
+                    print(
+                        f"Comparing {group_a} (n={len(group_a_values)}) vs "
+                        f"{group_b} (n={len(group_b_values)})"
+                    )
+                    if len(group_a_values) < 1 or len(group_b_values) < 1:
+                        print("Skipping comparison due to insufficient samples")
+                        continue
+
+                    # Check for NaN values
+                    group_a_values = [v for v in group_a_values if not np.isnan(v)]
+                    group_b_values = [v for v in group_b_values if not np.isnan(v)]
+
+                    if len(group_a_values) < 1 or len(group_b_values) < 1:
+                        print(
+                            "Skipping comparison due to all NaN values after filtering"
+                        )
+                        continue
+
+                    stat, p_value = stats.mannwhitneyu(group_a_values, group_b_values)
+
+                    comparison_key = f"{group_a}_vs_{group_b}"
+
+                    metric_results[comparison_key] = {
+                        "p_value": float(p_value),
+                        "statistic": float(stat),
+                        "significant": p_value < 0.05,
+                        f"{group_a}_mean": np.mean(group_a_values),
+                        f"{group_b}_mean": np.mean(group_b_values),
+                    }
+
+            group_comparison[metric] = metric_results
+            print(f"Completed group comparison for {metric}")
+
+        return group_comparison
+    except Exception as e:
+        print(f"Error in calculate_group_comparison: {str(e)}")
+        raise
 
 
 def run_diversity_analysis(
@@ -359,11 +494,29 @@ def run_diversity_analysis(
     Returns:
         Tuple of (alpha_diversity, beta_diversity, group_comparison) results
     """
+    try:
+        print("Starting diversity analysis")
+        print(f"Data: {len(data.sample_ids)} samples, {len(data.feature_ids)} features")
+        print(f"Metrics: {metrics}, Group by: {group_by}")
 
-    alpha_diversity = calculate_alpha_diversity(data, metrics)
+        # Check for NaN values in the counts matrix
+        counts_matrix = np.array(data.counts_matrix)
+        print(f"Contains NaN values: {np.isnan(counts_matrix).any()}")
+        if np.isnan(counts_matrix).any():
+            print(f"Number of NaN values: {np.isnan(counts_matrix).sum()}")
+            print(f"NaN positions: {np.where(np.isnan(counts_matrix))}")
 
-    beta_diversity = calculate_beta_diversity(data)
+        alpha_diversity = calculate_alpha_diversity(data, metrics)
+        print("Alpha diversity calculation completed")
 
-    group_comparison = calculate_group_comparison(data, group_by, alpha_diversity)
+        beta_diversity = calculate_beta_diversity(data)
+        print("Beta diversity calculation completed")
 
-    return alpha_diversity, beta_diversity, group_comparison
+        group_comparison = calculate_group_comparison(data, group_by, alpha_diversity)
+        print("Group comparison calculation completed")
+
+        print("Diversity analysis completed successfully")
+        return alpha_diversity, beta_diversity, group_comparison
+    except Exception as e:
+        print(f"Error in run_diversity_analysis: {str(e)}")
+        raise

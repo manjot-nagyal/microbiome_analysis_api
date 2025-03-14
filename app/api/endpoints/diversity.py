@@ -25,7 +25,18 @@ async def analyze_diversity(request: DiversityAnalysisRequest, data: MicrobiomeD
         Diversity analysis results
     """
 
+    print(
+        f"Diversity analysis request received. "
+        f"Metrics: {request.metrics}, "
+        f"Group by: {request.group_by}"
+    )
+    print(
+        f"Data received: {len(data.sample_ids)} "
+        f"samples, {len(data.feature_ids)} features"
+    )
+
     if data is None or not data.sample_ids or len(data.sample_ids) == 0:
+        print("Error: No data provided")
         raise HTTPException(
             status_code=400, detail="No data provided. Please provide data."
         )
@@ -39,9 +50,18 @@ async def analyze_diversity(request: DiversityAnalysisRequest, data: MicrobiomeD
             )
 
     try:
+        print("Running diversity analysis...")
         alpha_diversity_metrics, beta_diversity_metrics, group_comparison_metrics = (
             run_diversity_analysis(data, metrics=request.metrics)
         )
+
+        print("Diversity analysis completed successfully")
+        if alpha_diversity_metrics and len(alpha_diversity_metrics) > 0:
+            first_metric = list(alpha_diversity_metrics.keys())[0]
+            print(
+                f"Sample of {first_metric} results: "
+                f"{list(alpha_diversity_metrics[first_metric].items())[:2]}"
+            )
 
         response = DiversityAnalysisResponse(
             alpha_diversity_metrics=alpha_diversity_metrics,

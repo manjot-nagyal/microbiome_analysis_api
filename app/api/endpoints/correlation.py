@@ -4,7 +4,7 @@ from app.api.endpoints.upload import get_current_data
 from app.models.schemas import CorrelationAnalysisRequest, CorrelationAnalysisResponse
 from app.services.correlation_analysis import run_correlation_analysis
 
-router = APIRouter(prefix="/correlation")
+router = APIRouter()
 
 
 @router.post("/analyze", response_model=CorrelationAnalysisResponse)

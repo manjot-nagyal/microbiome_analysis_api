@@ -37,6 +37,29 @@ def sample_data():
     )
 
 
+@pytest.fixture
+def sample_data_with_nan():
+    """Create sample data with NaN and empty values"""
+    return MicrobiomeData(
+        sample_ids=["sample1", "sample2", "sample3", "sample4", "sample5"],
+        feature_ids=["taxon1", "taxon2", "taxon3", "taxon4"],
+        counts_matrix=[
+            [0.5, np.nan, 0.1, 0.1],  # NaN in count matrix
+            [0.1, 0.4, 0.2, 0.2],
+            [0.3, 0.3, np.nan, 0.1],  # NaN in count matrix
+            [0.2, 0.2, 0.3, 0.2],
+            [0.1, 0.1, 0.1, 0.1],
+        ],
+        metadata={
+            "sample1": {"group": "A", "age": 25, "sex": "M"},
+            "sample2": {"group": "A", "age": np.nan, "sex": "F"},  # NaN in metadata
+            "sample3": {"group": "B", "age": 28, "sex": "M"},
+            "sample4": {"group": "B", "age": 32, "sex": ""},  # Empty string in metadata
+            "sample5": {"group": "C", "age": 25, "sex": "M"},
+        },
+    )
+
+
 def test_calculate_alpha_diversity(sample_data):
     """
     Test the alpha diversity calculation
