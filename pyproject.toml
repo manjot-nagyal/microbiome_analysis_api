@@ -19,6 +19,8 @@ dependencies = [
     "pre-commit",
     "pytest",
     "scikit-bio",
+    "uvicorn",
+    "hypothesis",
 ]
 
 [project.optional-dependencies]
@@ -31,3 +33,6 @@ dev = [
 
 [tool.black]
 line-length = 88
+
+[tool.setuptools]
+packages = ["app"]

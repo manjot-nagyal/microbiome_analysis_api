@@ -1,12 +1,10 @@
-import logging
+import json
 from typing import Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.models.schemas import MicrobiomeData
-from app.utils.parsers import parse_csv_data
-
-logger = logging.getLogger(__name__)
+from app.utils.parsers import normalize_counts, parse_csv_data, parse_json_data
 
 router = APIRouter()
 
@@ -15,9 +13,13 @@ current_data = None
 
 
 @router.post("/", response_model=MicrobiomeData)
-async def upload_microbiome_data(file: Optional[UploadFile] = File(None)):
+async def upload_microbiome_data(
+    file: Optional[UploadFile] = File(None),
+    json_data: Optional[str] = Form(None),
+    normalize: bool = Form(True),
+):
     """
-    Upload microbiome data as CSV format
+    Upload microbiome data as CSV format or JSON
 
     Returns parsed microbiome data in a standardized format
 
@@ -38,17 +40,17 @@ async def upload_microbiome_data(file: Optional[UploadFile] = File(None)):
     """
     global current_data
 
-    if file is None:
+    if file is None and json_data is None:
         raise HTTPException(
             status_code=400,
-            detail="No file uploaded",
+            detail="No file uploaded or JSON data provided",
         )
 
     try:
         if file is not None:
             try:
-                content_str = await file.read()
-                content_str = content_str.decode("utf-8")
+                content = await file.read()
+                content_str = content.decode("utf-8")
             except UnicodeDecodeError:
                 raise HTTPException(
                     status_code=400,
@@ -57,28 +59,92 @@ async def upload_microbiome_data(file: Optional[UploadFile] = File(None)):
                     "Please ensure the file is in UTF-8 format.",
                 )
 
-            # Opens file if it has a .csv extension otherwise raises an error
+            # For CSV files
             if file.filename and file.filename.endswith(".csv"):
                 try:
+                    print(content_str)
                     data = parse_csv_data(content_str)
+
                 except Exception as e:
-                    logger.error(f"Error parsing CSV file: {str(e)}")
+
                     raise HTTPException(
                         status_code=400,
                         detail=f"Error parsing CSV file: {str(e)}. "
                         "Please check the file format and structure "
                         "against the documentation.",
                     )
+            # For JSON files
+            elif file.filename and file.filename.endswith(".json"):
+                try:
+                    data = parse_json_data(content_str)
+                except json.JSONDecodeError:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Invalid JSON format. Please ensure "
+                        "the file contains valid JSON data.",
+                    )
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Error parsing JSON data: {str(e)}. Please check "
+                        "file format/structure against documentation.",
+                    )
+
             else:
-                logger.error("Unsupported file type uploaded")
                 raise HTTPException(
                     status_code=400,
                     detail="Unsupported file type. "
                     "Please upload a correct file format.",
                 )
+        # Directly from JSON data
+        else:
+            try:
+                if json_data is None:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="No JSON data provided. Please provide valid JSON data.",
+                    )
+                data = parse_json_data(json_data)
+            except json.JSONDecodeError:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid JSON data. Please ensure you are "
+                    "submitting valid JSON in the required format.",
+                )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Error parsing JSON data: {str(e)}. Please check "
+                    "your data against the required format in the documentation.",
+                )
+
+        if normalize:
+            data = normalize_counts(data)
 
         current_data = data
-
         return data
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error parsing data: {str(e)}")
+
+
+@router.post("/current")
+async def reset_current_data():
+    """
+    Reset the currently loaded microbiome data.
+
+    This endpoint is useful for clearing the current data between analyses.
+    """
+    global current_data
+    current_data = None
+    return {"message": "Current microbiome data has been reset."}
+
+
+@router.get("/current", response_model=Optional[MicrobiomeData])
+async def get_current_data():
+    """
+    Get the currently loaded microbiome data.
+
+    Returns None if no data has been uploaded yet.
+    """
+    global current_data
+    return current_data

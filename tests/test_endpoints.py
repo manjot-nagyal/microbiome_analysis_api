@@ -1,23 +1,25 @@
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app  # Import your FastAPI app
+from app.main import app
 from app.models.schemas import DiversityAnalysisRequest, MicrobiomeData
 
 client = TestClient(app)
 
 
-# Sample test data
 @pytest.fixture
 def sample_data():
     return MicrobiomeData(
         sample_ids=["sample1", "sample2", "sample3", "sample4", "sample5"],
         feature_ids=["taxon1", "taxon2", "taxon3", "taxon4"],
         counts_matrix=[
-            [0.5, 0.2, 0.1, 0.1, 0.1],
-            [0.1, 0.4, 0.2, 0.2, 0.1],
-            [0.3, 0.3, 0.2, 0.1, 0.1],
-            [0.2, 0.2, 0.3, 0.2, 0.1],
+            [0.5, 0.2, 0.1, 0.1],
+            [0.1, 0.4, 0.2, 0.2],
+            [0.3, 0.3, 0.2, 0.1],
+            [0.2, 0.2, 0.3, 0.2],
+            [0.1, 0.1, 0.1, 0.1],
         ],
         metadata={
             "sample1": {"group": "A", "age": 25, "sex": "M"},
@@ -29,10 +31,32 @@ def sample_data():
     )
 
 
+@pytest.fixture
+def json_data():
+    return {
+        "sample_ids": ["sample1", "sample2", "sample3", "sample4", "sample5"],
+        "feature_ids": ["taxon1", "taxon2", "taxon3", "taxon4"],
+        "counts_matrix": [
+            [0.5, 0.2, 0.1, 0.1],
+            [0.1, 0.4, 0.2, 0.2],
+            [0.3, 0.3, 0.2, 0.1],
+            [0.2, 0.2, 0.3, 0.2],
+            [0.1, 0.1, 0.1, 0.1],
+        ],
+        "metadata": {
+            "sample1": {"group": "A", "age": 25, "sex": "M"},
+            "sample2": {"group": "A", "age": 30, "sex": "F"},
+            "sample3": {"group": "B", "age": 28, "sex": "M"},
+            "sample4": {"group": "B", "age": 32, "sex": "F"},
+            "sample5": {"group": "C", "age": 25, "sex": "M"},
+        },
+    }
+
+
 def test_upload_no_file():
     response = client.post("/upload/")
     assert response.status_code == 400
-    assert response.json() == {"detail": "No file uploaded"}
+    assert response.json() == {"detail": "No file uploaded or JSON data provided"}
 
 
 def test_upload_invalid_file_type():
@@ -52,11 +76,18 @@ def test_upload_invalid_file_type():
 
 def test_upload_valid_csv():
     csv_content = "sample_id,feature1,feature2\nsample1,10,20\nsample2,30,40"
+
+    from io import BytesIO
+
+    file_like = BytesIO(csv_content.encode("utf-8"))
+
     response = client.post(
-        "/upload/", files={"file": ("test.csv", csv_content, "text/csv")}
+        "/upload/", files={"file": ("test.csv", file_like, "text/csv")}
     )
-    assert response.status_code == 400
-    assert "Error parsing CSV file" in response.json()["detail"]
+    response_data = response.json()
+    assert response.status_code == 200
+    assert "sample_ids" in response_data
+    assert response_data["sample_ids"] == ["sample1", "sample2"]
 
 
 def test_upload_csv_with_parsing_error():
@@ -68,32 +99,54 @@ def test_upload_csv_with_parsing_error():
     assert "Error parsing CSV file" in response.json()["detail"]
 
 
+def test_upload_json_data_direct(json_data):
+    """Test uploading microbiome data as JSON."""
+    response = client.post(
+        "/upload/",
+        data={"json_data": json.dumps(json_data), "normalize": "true"},
+    )
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["sample_ids"] == json_data["sample_ids"]
+    assert data["feature_ids"] == json_data["feature_ids"]
+    assert len(data["counts_matrix"]) == len(json_data["counts_matrix"])
+
+
+def test_upload_json_data_file(json_data):
+    """Test uploading microbiome data as JSON."""
+    response = client.post(
+        "/upload/",
+        files={"file": ("test.json", json.dumps(json_data), "application/json")},
+    )
+    assert response.status_code == 200
+    assert "sample_ids" in response.json()
+    assert response.json()["sample_ids"] == [
+        "sample1",
+        "sample2",
+        "sample3",
+        "sample4",
+        "sample5",
+    ]
+
+
 def test_analyze_diversity(sample_data):
     # Sample request data
     request = DiversityAnalysisRequest(
         metrics=["shannon", "simpson", "pielou", "chao1"]
     )
-
-    # Sample microbiome data
     data = sample_data
-
     payload = {"request": {"metrics": request.metrics}, "data": data.model_dump()}
 
-    # Make the API request
     response = client.post("/diversity/analyze", json=payload)
 
-    print(response.json())
-
-    # Assert the response
     assert response.status_code == 200
 
-    # Assert response structure
     assert "alpha_diversity_metrics" in response.json()
     assert "beta_diversity_metrics" in response.json()
     assert "group_comparison_metrics" in response.json()
     assert "sample_ids" in response.json()
 
-    # Assert response values
     assert len(response.json()["alpha_diversity_metrics"]["shannon"]) == len(
         data.sample_ids
     )
@@ -113,3 +166,19 @@ def test_analyze_diversity(sample_data):
         data.sample_ids
     )
     assert len(response.json()["sample_ids"]) == len(data.sample_ids)
+
+
+def test_error_handling(json_data):
+    """Test error handling in the API."""
+
+    # Test invalid diversity metric
+    client.post(
+        "/upload/",
+        data={"json_data": json.dumps(json_data), "normalize": "true"},
+    )
+
+    response = client.post(
+        "/diversity/analyze",
+        json={"request": {"metrics": ["invalid_metric"]}, "data": json_data},
+    )
+    assert response.status_code == 400

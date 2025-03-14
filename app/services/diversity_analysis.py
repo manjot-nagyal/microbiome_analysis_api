@@ -29,12 +29,11 @@ def shannon_diversity(counts: np.ndarray) -> float:
     """
     counts = np.asarray(counts, dtype=float)
 
-    # account for negative abundance values
     if np.any(counts < 0):
         raise ValueError("Negative abundance values are not allowed")
 
     counts = counts[counts > 0]
-    # consider edge case where there are no counts
+
     if counts.size == 0:
         return np.nan
 
@@ -63,14 +62,12 @@ def simpson_diversity(counts: np.ndarray) -> float:
     """
     counts = np.asarray(counts, dtype=float)
 
-    # account for negative abundance values
     if np.any(counts < 0):
         raise ValueError("Negative abundance values are not allowed")
 
     counts = counts[counts > 0]
     proportions = counts / counts.sum()
 
-    # consider edge case where there are no counts
     if counts.size == 0:
         return np.nan
 
@@ -99,7 +96,6 @@ def pielou_evenness(counts: np.ndarray) -> float:
     """
     counts = np.asarray(counts, dtype=float)
 
-    # account for negative abundance values
     if np.any(counts < 0):
         raise ValueError("Negative abundance values are not allowed")
 
@@ -111,10 +107,9 @@ def pielou_evenness(counts: np.ndarray) -> float:
         return np.nan
 
     observed_species = np.count_nonzero(counts)
-    # account for when there is only one species
+
     if observed_species == 1:
         return 1.0
-    #     return 0.0
 
     proportions = counts / total
     # ignore proportions that are too tiny to be considered
@@ -126,7 +121,6 @@ def pielou_evenness(counts: np.ndarray) -> float:
     if np.isnan(h_prime) or np.isinf(h_prime):
         return np.nan
 
-    # calculate maximum diversity
     max_diversity = np.log(observed_species) if observed_species > 1 else 0.0
 
     if h_prime == 0.0 or max_diversity == 0.0:
@@ -159,7 +153,6 @@ def chao1_estimator(counts: np.ndarray) -> float:
     """
     counts = np.asarray(counts, dtype=float)
 
-    # account for negative abundance values
     if np.any(counts < 0):
         raise ValueError("Negative abundance values are not allowed")
     if counts.size == 0:
@@ -205,9 +198,9 @@ def calculate_alpha_diversity(
 
     for metric in metrics:
         metric_results = {}
-        # Iterate over each column in the counts matrix
+
         for j, sample_id in enumerate(sample_ids):
-            sample_counts = counts_matrix[:, j]
+            sample_counts = counts_matrix[j, :]
             if metric == "shannon":
                 alpha_diversity_value = shannon_diversity(sample_counts)
             elif metric == "simpson":
@@ -247,7 +240,7 @@ def calculate_beta_diversity(
         ValueError: If any unsupported metric is provided
     """
 
-    counts_matrix = np.array(data.counts_matrix).T
+    counts_matrix = np.array(data.counts_matrix)
     results = {}
 
     for metric in metrics:

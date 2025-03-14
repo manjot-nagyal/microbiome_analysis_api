@@ -1,4 +1,8 @@
-# import numpy as np
+import json
+from io import StringIO
+from typing import Any, Dict, List, Optional
+
+import numpy as np
 import pandas as pd
 
 from app.models.schemas import MicrobiomeData
@@ -9,24 +13,94 @@ def parse_csv_data(content_str: str) -> MicrobiomeData:
     Parse the CSV data into a MicrobiomeData object
     """
 
-    df = pd.read_csv(content_str, index_col=0)
+    df = pd.read_csv(StringIO(content_str), index_col=0)
+
+    print(df)
 
     # Separate metadata from data
-    metadata_cols = df.columns[df.columns.str.startswith("metadata_")]
-    data_cols = df.columns[~df.columns.str.startswith("metadata_")]
+    metadata_cols = [col for col in df.columns if col.startswith("metadata_")]
+    data_cols = [col for col in df.columns if not col.startswith("metadata_")]
+    sample_ids = df.index.tolist()
 
     # Extract feature counts
     counts_df = df[data_cols]
 
-    # TODO: Extract and format metadata
-    md_df = df[metadata_cols]
+    metadata: Optional[Dict[str, Dict[str, Any]]] = None
+    if metadata_cols:
+        metadata_df = df[metadata_cols]
+        metadata = {}
+
+        for sample_id in df.index:
+            metadata[sample_id] = {}
+            for meta_col in metadata_cols:
+                clean_meta_name = meta_col.replace("metadata_", "")
+                metadata[sample_id][clean_meta_name] = metadata_df.loc[
+                    sample_id, meta_col
+                ]
+    try:
+        counts_matrix: List[List[float]] = [
+            [float(val) for val in sample] for sample in counts_df.values
+        ]
+    except ValueError as e:
+        raise ValueError("Error parsing CSV file: " + str(e))
 
     # Create MicrobiomeData object
     microbiome_data = MicrobiomeData(
-        sample_ids=counts_df.index.tolist(),
-        feature_ids=counts_df.columns.tolist(),
-        counts_matrix=counts_df.values.tolist(),
-        metadata=(md_df.to_dict(orient="records") if md_df is not None else None),
+        sample_ids=sample_ids,
+        feature_ids=data_cols,
+        counts_matrix=counts_matrix,
+        metadata=metadata,
     )
 
     return microbiome_data
+
+
+def parse_json_data(content: str) -> MicrobiomeData:
+    """
+    Parse JSON format microbiome data.
+
+    Expected format:
+    {
+        "sample_ids": ["sample1", "sample2", ...],
+        "taxonomy_ids": ["taxon1", "taxon2", ...],
+        "abundance_matrix": [[val1, val2, ...], [val1, val2, ...], ...],
+        "metadata": {
+            "sample1": {"metadata1": value1, "metadata2": value2, ...},
+            "sample2": {"metadata1": value1, "metadata2": value2, ...},
+            ...
+        }
+    }
+
+    Args:
+        content: JSON data as string
+
+    Returns:
+        MicrobiomeData object with parsed data
+    """
+    data = json.loads(content)
+
+    return MicrobiomeData(**data)
+
+
+def normalize_counts(data: MicrobiomeData) -> MicrobiomeData:
+    """
+    Normalize counts data to relative abundance (sum to 1 for each sample).
+
+    Args:
+        data: MicrobiomeData object with raw abundance counts
+
+    Returns:
+        MicrobiomeData object with normalized abundance values
+    """
+
+    counts_matrix = np.array(data.counts_matrix)
+
+    row_sums = counts_matrix.sum(axis=1, keepdims=True)
+
+    row_sums[row_sums == 0] = 1.0
+    normalized_matrix = counts_matrix / row_sums
+
+    data_dict = data.model_dump()
+    data_dict["counts_matrix"] = normalized_matrix.tolist()
+
+    return MicrobiomeData(**data_dict)

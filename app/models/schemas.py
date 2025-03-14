@@ -36,6 +36,10 @@ class DiversityAnalysisRequest(BaseModel):
         description="List of diversity metrics to calculate",
     )
 
+    group_by: Optional[str] = Field(
+        None, description="Optional metadata column to group samples by for comparison"
+    )
+
 
 class DiversityAnalysisResponse(BaseModel):
     """Response schema for diversity analysis."""
@@ -54,3 +58,55 @@ class DiversityAnalysisResponse(BaseModel):
     )
 
     sample_ids: List[str] = Field(..., description="List of sample ids")
+
+
+class CorrelationAnalysisRequest(BaseModel):
+    """Request schema for correlation analysis."""
+
+    correlation_method: str = Field(
+        "spearman",
+        description="Correlation method to use ('pearson', 'spearman', or 'kendall')",
+    )
+    metadata_columns: Optional[List[str]] = Field(
+        None, description="Optional list of metadata columns to correlate with taxa"
+    )
+    min_abundance: float = Field(
+        0.01,
+        description="Minimum relative abundance threshold for "
+        "a taxon to be included in the analysis",
+    )
+    min_prevalence: float = Field(
+        0.1,
+        description="Minimum fraction of samples in which a "
+        "taxon must be present to be included",
+    )
+
+
+class CorrelationAnalysisResponse(BaseModel):
+    """Response schema for correlation analysis results."""
+
+    taxon_correlations: Dict[str, Dict[str, float]] = Field(
+        ..., description="Correlations between taxa, keyed by pairs of taxonomy IDs"
+    )
+    metadata_correlations: Optional[Dict[str, Dict[str, float]]] = Field(
+        None,
+        description="Correlations between taxa and metadata, "
+        "keyed by taxonomy ID and metadata column",
+    )
+    p_values: Dict[str, Dict[str, float]] = Field(
+        ...,
+        description="P-values for correlations, with the same "
+        "structure as the correlation matrices",
+    )
+    filtered_taxa: List[str] = Field(
+        ...,
+        description="List of taxonomy IDs that passed the "
+        "abundance and prevalence filters",
+    )
+
+
+class AnalysisResult(BaseModel):
+    """Generic schema for analysis results."""
+
+    analysis_type: str
+    result: Union[DiversityAnalysisResponse, CorrelationAnalysisResponse]

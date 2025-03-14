@@ -25,12 +25,11 @@ async def analyze_diversity(request: DiversityAnalysisRequest, data: MicrobiomeD
         Diversity analysis results
     """
 
-    if data is None:
+    if data is None or not data.sample_ids or len(data.sample_ids) == 0:
         raise HTTPException(
             status_code=400, detail="No data provided. Please provide data."
         )
 
-    # Validate request parameters
     supported_metrics = ["shannon", "simpson", "pielou", "chao1"]
     for metric in request.metrics:
         if metric not in supported_metrics:
@@ -38,22 +37,22 @@ async def analyze_diversity(request: DiversityAnalysisRequest, data: MicrobiomeD
                 status_code=400,
                 detail=f"Unsupported diversity metric: {metric}.",
             )
-    # Run diversity analysis
+
     try:
         alpha_diversity_metrics, beta_diversity_metrics, group_comparison_metrics = (
             run_diversity_analysis(data, metrics=request.metrics)
         )
+
+        response = DiversityAnalysisResponse(
+            alpha_diversity_metrics=alpha_diversity_metrics,
+            beta_diversity_metrics=beta_diversity_metrics,
+            group_comparison_metrics=group_comparison_metrics,
+            sample_ids=data.sample_ids,
+        )
+
+        return response
+
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error during diversity analysis: {str(e)}"
         )
-
-    # Returnresponse object with all metrics
-    response = DiversityAnalysisResponse(
-        alpha_diversity_metrics=alpha_diversity_metrics,
-        beta_diversity_metrics=beta_diversity_metrics,
-        group_comparison_metrics=group_comparison_metrics,
-        sample_ids=data.sample_ids,
-    )
-
-    return response
