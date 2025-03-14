@@ -588,7 +588,7 @@ else:
             """
         ### CSV Format
         - First column: sample_id
-        - First row: feature_id (taxa names)
+        - Remaining columns: feature_id (e.g. taxa names)
         - Remaining cells: abundance counts
         - Optional metadata columns should have the prefix 'metadata_'
         ### JSON Format
