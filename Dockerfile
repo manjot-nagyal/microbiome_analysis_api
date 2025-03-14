@@ -25,8 +25,7 @@ RUN uv pip install --system -e "."
 # Test
 FROM base AS test
 
-COPY . .
-RUN uv pip install --system -e ".[dev]"
+RUN uv pip install --system -e ".[all]"
 
 ARG TEST_CMD="pytest -v"
 RUN ${TEST_CMD}
@@ -37,6 +36,8 @@ FROM base AS backend
 
 RUN apt-get update && apt-get install -y curl && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+RUN uv pip install --system -e ".[backend]"
+
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
@@ -45,9 +46,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 # Frontend
 FROM base AS frontend
 
-COPY . .
-
-RUN uv pip install --system streamlit
+RUN uv pip install --system -e ".[frontend]"
 
 EXPOSE 8501
 

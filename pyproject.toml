@@ -11,16 +11,18 @@ dependencies = [
     "numpy",
     "pandas",
     "scipy",
-    "fastapi",
-    "uvicorn",
     "pydantic",
     "httpx",
     "python-multipart",
-    "pre-commit",
-    "pytest",
     "scikit-bio",
+]
+
+[project.optional-dependencies]
+backend = [
+    "fastapi",
     "uvicorn",
-    "hypothesis",
+]
+frontend = [
     "streamlit",
     "matplotlib",
     "seaborn",
@@ -28,14 +30,15 @@ dependencies = [
     "networkx",
     "scikit-learn",
 ]
-
-[project.optional-dependencies]
 dev = [
     "pytest",
     "isort",
     "black",
     "flake8",
+    "pre-commit",
+    "hypothesis",
 ]
+all = ["microbiome_analysis_api[backend,frontend,dev]"]
 
 [tool.black]
 line-length = 88
