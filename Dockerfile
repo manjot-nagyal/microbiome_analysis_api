@@ -19,6 +19,8 @@ RUN apt-get update \
 
 RUN pip install uv
 
+COPY . .
+RUN uv pip install --system -e "."
 
 # Test
 FROM base AS test
@@ -33,9 +35,6 @@ RUN ${TEST_CMD}
 # Backend
 FROM base AS backend
 
-COPY . .
-RUN uv pip install --system -e "."
-
 RUN apt-get update && apt-get install -y curl && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 8000
@@ -47,8 +46,9 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 FROM base AS frontend
 
 COPY . .
-RUN uv pip install --system -e "."
+
+RUN uv pip install --system streamlit
 
 EXPOSE 8501
 
-CMD uv run streamlit run frontend.py -- --server.port=8501 --server.address=0.0.0.0
+CMD ["streamlit", "run", "frontend.py", "--", "--server.port=8501", "--server.address=0.0.0.0"]

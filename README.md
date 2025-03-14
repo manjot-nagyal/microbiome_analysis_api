@@ -99,6 +99,8 @@ Example:
 }
 ```
 
+Sample data of both formats (JSON and CSV) is available in the `sample_data` directory. 
+
 ### Using the Dashboard
 
 1. **Upload Data**:
